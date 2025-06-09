@@ -214,7 +214,7 @@ required_descriptors = ["MAXdssC", "VSA_EState7", "SMR_VSA10", "PEOE_VSA8"]
 @st.cache_resource(show_spinner=False, max_entries=1)  # 限制只缓存一个实例
 def load_predictor():
     """缓存模型加载，避免重复加载导致内存溢出"""
-    return TabularPredictor.load("./ag-20250529_123557")
+    return TabularPredictor.load("./ag-20250609_005753")
 
 # 缓存 Mordred 计算器
 @st.cache_resource
