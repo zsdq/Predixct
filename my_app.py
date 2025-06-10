@@ -206,7 +206,7 @@ solvent_data = {
 solvent = st.selectbox("Select Solvent:", list(solvent_data.keys()))
 
 # SMILES 输入区域
-smiles = st.text_input("Enter the SMILES representation of the molecule:", placeholder="e.g., NC1=CC=C(C=C1)C(=O)O")
+smiles = st.text_input("Enter the SMILES representation of the molecule:", placeholder="e.g., [BH3-][P+]1(c2ccccc2)c2ccccc2-c2sc3ccccc3c21,Solvent:Cyclohexane")
 
 # 提交按钮
 submit_button = st.button("Submit and Predict", key="predict_button")
