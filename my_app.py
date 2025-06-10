@@ -436,7 +436,7 @@ if submit_button:
                     "SdP": [solvent_params["SdP"]],
                     "SA": [solvent_params["SA"]],
                     "SB": [solvent_params["SB"]],
-                    'nBondsD': [data.[1"nBondsD"]], 
+                    'nBondsD': [data.["nBondsD"]], 
                     'SdssC': [data["SdssC"]], 
                     'PEOE_VSA8': [data["PEOE_VSA8"]], 
                     'SMR_VSA3': [data["SMR_VSA3"]], 
