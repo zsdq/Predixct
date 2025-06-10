@@ -14,6 +14,7 @@ from autogluon.tabular import FeatureMetadata
 import gc  # 添加垃圾回收模块
 import re  # 添加正则表达式模块用于处理SVG
 from tqdm import tqdm 
+import numpy as np
 
 
 # 添加 CSS 样式
