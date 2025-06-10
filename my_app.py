@@ -335,10 +335,14 @@ def get_descriptors(smiles_str):
         st.warning(f"Mordred descriptor calculation error: {str(e)}")
         sdssc = 0.0
 
+    # 只返回所需的特征
     return {
+        "nBondsD": rdkit_descs["nBondsD"],
         "SdssC": sdssc,
+        "PEOE_VSA8": rdkit_descs["PEOE_VSA8"],
+        "SMR_VSA3": rdkit_descs["SMR_VSA3"],
         "n6HRing": n6HRing,
-        **rdkit_descs
+        "SMR_VSA10": rdkit_descs["SMR_VSA10"]
     }
 
 # 如果点击提交按钮
@@ -385,12 +389,7 @@ if submit_button:
                     "SdP": [solvent_params["SdP"]],
                     "SA": [solvent_params["SA"]],
                     "SB": [solvent_params["SB"]],
-                    "nBondsD": [desc_values["nBondsD"]],
-                    "SdssC": [desc_values["SdssC"]],
-                    "PEOE_VSA8": [desc_values["PEOE_VSA8"]],
-                    "SMR_VSA3": [desc_values["SMR_VSA3"]],
-                    "n6HRing": [desc_values["n6HRing"]],
-                    "SMR_VSA10": [desc_values["SMR_VSA10"]],
+                    **desc_values
                 }
             
                 input_df = pd.DataFrame(input_data)
@@ -401,18 +400,12 @@ if submit_button:
 
                 # 创建预测用数据框 - 使用新的特征
                 predict_df = pd.DataFrame({
-                    "SMILES": [smiles],
                     "Et30": [solvent_params["Et30"]],
                     "SP": [solvent_params["SP"]],
                     "SdP": [solvent_params["SdP"]],
                     "SA": [solvent_params["SA"]],
                     "SB": [solvent_params["SB"]],
-                    "nBondsD": [desc_values["nBondsD"]],
-                    "SdssC": [desc_values["SdssC"]],
-                    "PEOE_VSA8": [desc_values["PEOE_VSA8"]],
-                    "SMR_VSA3": [desc_values["SMR_VSA3"]],
-                    "n6HRing": [desc_values["n6HRing"]],
-                    "SMR_VSA10": [desc_values["SMR_VSA10"]]
+                    **desc_values
                 })
                 
                 # 加载模型并预测
