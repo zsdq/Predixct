@@ -403,7 +403,7 @@ if submit_button:
                 # 计算指定描述符 - 现在传递SMILES字符串
                 rdkit_features = calc_rdkit_descriptors(smiles)
                 mordred_features = calc_mordred_descriptors(smiles)
-                final_df = pd.concat(rdkit_features, mordred_features).drop_duplicates()
+                final_df = pd.concat([rdkit_features, mordred_features]).drop_duplicates()
                 data = final_df.loc[:, ['nBondsD', 'SdssC', 'PEOE_VSA8', 'SMR_VSA3', 'n6HRing', 'SMR_VSA10']]
 
                 # 创建输入数据表 - 使用新的特征
