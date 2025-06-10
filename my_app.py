@@ -403,11 +403,7 @@ if submit_button:
                 # 计算指定描述符 - 现在传递SMILES字符串
                 rdkit_features = calc_rdkit_descriptors(smiles)
                 mordred_features = calc_mordred_descriptors(smiles)
-                common_indices = rdkit_features.index.intersection(mordred_features.index)
-                # 确保所有DataFrame使用相同的索引
-                rdkit_clean = rdkit_features.loc[common_indices].reset_index(drop=True)
-                mordred_clean = mordred_features.loc[common_indices].drop('SMILES', axis=1).reset_index(drop=True)
-                final_df = merge_features_without_duplicates(rdkit_clean, mordred_clean)
+                final_df = pd.concat(rdkit_features, mordred_features).drop_duplicates()
                 data = final_df.loc[:, ['nBondsD', 'SdssC', 'PEOE_VSA8', 'SMR_VSA3', 'n6HRing', 'SMR_VSA10']]
 
                 # 创建输入数据表 - 使用新的特征
