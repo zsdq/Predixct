@@ -207,8 +207,8 @@ smiles = st.text_input("Enter the SMILES representation of the molecule:", place
 # 提交按钮
 submit_button = st.button("Submit and Predict", key="predict_button")
 
-# 指定的描述符列表
-required_descriptors = ["MAXdssC", "VSA_EState7", "SMR_VSA10", "PEOE_VSA8"]
+# 指定的描述符列表 - 已更新为所需的特征
+required_descriptors = ["nBondsD", "SdssC", "PEOE_VSA8", "SMR_VSA3", "n6HRing", "SMR_VSA10"]
 
 # 缓存模型加载器以避免重复加载
 @st.cache_resource(show_spinner=False, max_entries=1)  # 限制只缓存一个实例
@@ -283,16 +283,16 @@ def get_descriptors(smiles_str):
     # 计算RDKit描述符 - 使用添加了H的分子
     try:
         rdkit_descs = {
-            "VSA_EState7": Descriptors.VSA_EState7(mol),
-            "SMR_VSA10": Descriptors.SMR_VSA10(mol),
             "PEOE_VSA8": Descriptors.PEOE_VSA8(mol),
+            "SMR_VSA3": Descriptors.SMR_VSA3(mol),
+            "SMR_VSA10": Descriptors.SMR_VSA10(mol),
         }
     except Exception as e:
         st.warning(f"RDKit descriptor calculation error: {str(e)}")
         rdkit_descs = {
-            "VSA_EState7": 0.0,
-            "SMR_VSA10": 0.0,
             "PEOE_VSA8": 0.0,
+            "SMR_VSA3": 0.0,
+            "SMR_VSA10": 0.0,
         }
 
     # 计算Mordred描述符 - 需要3D结构
@@ -307,18 +307,31 @@ def get_descriptors(smiles_str):
         calc = get_mordred_calculator()
         mordred_desc = calc(mol_3d)
         
-        # 获取MAXdssC值
-        maxdssc = mordred_desc["MAXdssC"]
-        if pd.isna(maxdssc):
-            maxdssc = 0.0
+        # 获取所需特征值
+        nBondsD = mordred_desc["nBondsD"]
+        SdssC = mordred_desc["SdssC"]
+        n6HRing = mordred_desc["n6HRing"]
+        
+        # 处理缺失值
+        if pd.isna(nBondsD):
+            nBondsD = 0
+        if pd.isna(SdssC):
+            SdssC = 0.0
+        if pd.isna(n6HRing):
+            n6HRing = 0
     except Exception as e:
         st.warning(f"Mordred descriptor calculation error: {str(e)}")
-        maxdssc = 0.0
+        nBondsD = 0
+        SdssC = 0.0
+        n6HRing = 0
 
     return {
-        "MAXdssC": maxdssc,
+        "nBondsD": nBondsD,
+        "SdssC": SdssC,
+        "n6HRing": n6HRing,
         **rdkit_descs
     }
+
 
 
 
