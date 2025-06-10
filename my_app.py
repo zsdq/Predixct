@@ -220,7 +220,12 @@ def load_predictor():
 @st.cache_resource
 def get_mordred_calculator():
     """创建并缓存 Mordred 计算器"""
-    return Calculator(descriptors, ignore_3D=True)
+    try:
+        from mordred import descriptors
+        return Calculator([descriptors.SdssC], ignore_3D=True)
+    except Exception as e:
+        st.warning(f"Error creating Mordred calculator: {str(e)}")
+        return None
 
 def mol_to_image(mol, size=(300, 300)):
     """将分子转换为背景颜色为 #f9f9f9f9 的SVG图像"""
@@ -268,7 +273,6 @@ def mol_to_image(mol, size=(300, 300)):
     
     return svg
 
-
 # 修改描述符计算函数
 @st.cache_data(max_entries=10)  # 缓存最多10个分子的描述符计算
 def get_descriptors(smiles_str):
@@ -287,7 +291,7 @@ def get_descriptors(smiles_str):
             "PEOE_VSA8": Descriptors.PEOE_VSA8(mol),
             "SMR_VSA3": Descriptors.SMR_VSA3(mol),
             "SMR_VSA10": Descriptors.SMR_VSA10(mol),
-            "nBondsD": Descriptors.NumDoubleBonds(mol),
+            "nBondsD": Descriptors.NumDoubleBonds(mol) if hasattr(Descriptors, 'NumDoubleBonds') else 0.0,
         }
     except Exception as e:
         st.warning(f"RDKit descriptor calculation error: {str(e)}")
@@ -321,11 +325,11 @@ def get_descriptors(smiles_str):
 
         # 计算Mordred描述符
         calc = get_mordred_calculator()
-        mordred_desc = calc(mol_3d)
-
-        # 获取SdssC值
-        sdssc = mordred_desc["SdssC"]
-        if pd.isna(sdssc):
+        if calc:
+            mordred_desc = calc(mol_3d)
+            # 获取SdssC值
+            sdssc = mordred_desc["SdssC"] if hasattr(mordred_desc, "SdssC") else 0.0
+        else:
             sdssc = 0.0
     except Exception as e:
         st.warning(f"Mordred descriptor calculation error: {str(e)}")
@@ -336,11 +340,6 @@ def get_descriptors(smiles_str):
         "n6HRing": n6HRing,
         **rdkit_descs
     }
-# 修改Mordred计算器只计算SdssC描述符以提高效率
-@st.cache_resource
-def get_mordred_calculator():
-    """创建并缓存 Mordred 计算器，只计算SdssC"""
-    return Calculator([descriptors.SdssC], ignore_3D=True)
 
 # 如果点击提交按钮
 if submit_button:
@@ -378,9 +377,6 @@ if submit_button:
                 # 计算指定描述符 - 现在传递SMILES字符串
                 desc_values = get_descriptors(smiles)
 
-               # 计算指定描述符 - 现在传递SMILES字符串
-                desc_values = get_descriptors(smiles)
-            
                 # 创建输入数据表 - 使用新的特征
                 input_data = {
                     "SMILES": [smiles],
