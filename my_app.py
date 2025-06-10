@@ -367,19 +367,6 @@ def merge_features_without_duplicates(original_df, *feature_dfs):
     # 保留第一个出现的列（根据合并顺序）
     merged = merged.loc[:, ~merged.columns.duplicated()]
     
-    # 添加特征统计信息
-    print("\nFeature statistics:")
-    print(f"Total number of features: {len(merged.columns)}")
-    
-    # 计算缺失值比例
-    missing_percentage = merged.isna().mean().sort_values(ascending=False)
-    high_missing = missing_percentage[missing_percentage > 0.5]
-    
-    if not high_missing.empty:
-        print("\nHigh missing value features (>50%):")
-        for feature, percentage in high_missing.items():
-            print(f"  - {feature}: {percentage:.1%}")
-    
     return merged
 
 
