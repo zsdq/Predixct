@@ -405,10 +405,9 @@ if submit_button:
                 mordred_features = calc_mordred_descriptors(smiles)
                 common_indices = rdkit_features.index.intersection(mordred_features.index)
                 # 确保所有DataFrame使用相同的索引
-                valid_df = data.iloc[common_indices].reset_index(drop=True)
                 rdkit_clean = rdkit_features.loc[common_indices].reset_index(drop=True)
                 mordred_clean = mordred_features.loc[common_indices].drop('SMILES', axis=1).reset_index(drop=True)
-                final_df = merge_features_without_duplicates(valid_df, rdkit_clean, mordred_clean)
+                final_df = merge_features_without_duplicates(rdkit_clean, mordred_clean)
                 data = final_df.loc[:, ['nBondsD', 'SdssC', 'PEOE_VSA8', 'SMR_VSA3', 'n6HRing', 'SMR_VSA10']]
 
                 # 创建输入数据表 - 使用新的特征
