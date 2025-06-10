@@ -216,17 +216,6 @@ def load_predictor():
     """缓存模型加载，避免重复加载导致内存溢出"""
     return TabularPredictor.load("./ag-20250609_005753")
 
-# 缓存 Mordred 计算器
-@st.cache_resource
-def get_mordred_calculator():
-    """创建并缓存 Mordred 计算器"""
-    try:
-        from mordred import descriptors
-        return Calculator([descriptors.SdssC], ignore_3D=True)
-    except Exception as e:
-        st.warning(f"Error creating Mordred calculator: {str(e)}")
-        return None
-
 def mol_to_image(mol, size=(300, 300)):
     """将分子转换为背景颜色为 #f9f9f9f9 的SVG图像"""
     # 创建绘图对象
@@ -272,78 +261,107 @@ def mol_to_image(mol, size=(300, 300)):
         svg = re.sub(r'viewBox="[^"]+"', f'viewBox="0 0 {size[0]} {size[1]}"', svg)
     
     return svg
+# 1. 改进的RDKit描述符计算函数
+def calc_rdkit_descriptors(smiles_list):
+    # 获取所有可用描述符名称
+    desc_names = [desc_name for desc_name, _ in Descriptors._descList]
+    calculator = MoleculeDescriptors.MolecularDescriptorCalculator(desc_names)
+    
+    results = []
+    valid_indices = []
+    skipped_molecules = []
+    
+    for idx, smi in tqdm(enumerate(smiles_list), total=len(smiles_list), desc="计算RDKit描述符"):
+        try:
+            mol = Chem.MolFromSmiles(smi)
+            if mol is None:
+                raise ValueError(f"无效的SMILES: {smi}")
+            
+            # 添加氢原子以获得更准确的计算
+            mol = Chem.AddHs(mol)
+            
+            # 计算所有描述符
+            descriptors = calculator.CalcDescriptors(mol)
+            
+            # 检查并处理特殊值
+            processed_descriptors = []
+            for val in descriptors:
+                # 处理所有不可用的值类型
+                if isinstance(val, float) and (np.isnan(val) or np.isinf(val)):
+                    processed_descriptors.append(np.nan)
+                elif val is None:  # 处理None值
+                    processed_descriptors.append(np.nan)
+                else:
+                    processed_descriptors.append(val)
+            
+            results.append(processed_descriptors)
+            valid_indices.append(idx)
+        except Exception as e:
+            skipped_molecules.append((smi, str(e)))
+            print(f"跳过SMILES: {smi}, 原因: {str(e)}")
+            continue
+    
+    # 转换为DataFrame并保留有效索引
+    df_desc = pd.DataFrame(results, columns=desc_names, index=valid_indices)
+    
+    return df_desc
+# 2. 改进的Mordred描述符计算函数（不再需要Missing）
+def calc_mordred_descriptors(smiles_list):
+    # 创建仅包含2D描述符的计算器
+    calc = Calculator(descriptors, ignore_3D=True)
+    
+    results = []
+    valid_smiles = []
+    skipped_molecules = []
+    
+    for smi in tqdm(smiles_list, desc="计算Mordred描述符"):
+        try:
+            mol = Chem.MolFromSmiles(smi)
+            if mol is None:
+                raise ValueError(f"无效的SMILES: {smi}")
+            
+            # 添加氢原子以获得更准确的计算
+            mol = Chem.AddHs(mol)
+            
+            # 计算描述符
+            res = calc(mol)
+            
+            # 处理结果，保留原始值或转换为NaN
+            descriptor_dict = {}
+            for key, val in res.asdict().items():
+                # 处理NaN和无穷大
+                if isinstance(val, float) and (np.isnan(val) or np.isinf(val)):
+                    descriptor_dict[key] = np.nan
+                # 处理None值
+                elif val is None:
+                    descriptor_dict[key] = np.nan
+                # 处理Mordred的Missing值（无需特殊导入）
+                elif hasattr(val, '__class__') and val.__class__.__name__ == 'Missing':  # 替代Missing检查
+                    descriptor_dict[key] = np.nan
+                else:
+                    descriptor_dict[key] = val
+            
+            results.append(descriptor_dict)
+            valid_smiles.append(smi)
+        except Exception as e:
+            skipped_molecules.append((smi, str(e)))
+            print(f"跳过SMILES: {smi}, 原因: {str(e)}")
+            continue
+    
+    # 创建DataFrame
+    df_mordred = pd.DataFrame(results)
+    df_mordred['SMILES'] = valid_smiles
+    return df_mordred
+# 3. 改进的特征合并函数
+def merge_features_without_duplicates(original_df, *feature_dfs):
+    """合并多个特征DataFrame并去除重复列"""
+    # 按顺序合并（后出现的重复列会被丢弃）
+    merged = pd.concat([original_df] + list(feature_dfs), axis=1)
+    
+    # 保留第一个出现的列（根据合并顺序）
+    merged = merged.loc[:, ~merged.columns.duplicated()]
+    return merged
 
-# 修改描述符计算函数
-@st.cache_data(max_entries=10)  # 缓存最多10个分子的描述符计算
-def get_descriptors(smiles_str):
-    """获取指定的分子描述符并缓存结果"""
-    # 从SMILES创建分子
-    mol = Chem.MolFromSmiles(smiles_str)
-    if not mol:
-        return None
-
-    # 添加氢原子
-    mol = Chem.AddHs(mol)
-
-    # 计算RDKit描述符 - 使用添加了H的分子
-    try:
-        rdkit_descs = {
-            "PEOE_VSA8": Descriptors.PEOE_VSA8(mol),
-            "SMR_VSA3": Descriptors.SMR_VSA3(mol),
-            "SMR_VSA10": Descriptors.SMR_VSA10(mol),
-            "nBondsD": Descriptors.NumDoubleBonds(mol) if hasattr(Descriptors, 'NumDoubleBonds') else 0.0,
-        }
-    except Exception as e:
-        st.warning(f"RDKit descriptor calculation error: {str(e)}")
-        rdkit_descs = {
-            "PEOE_VSA8": 0.0,
-            "SMR_VSA3": 0.0,
-            "SMR_VSA10": 0.0,
-            "nBondsD": 0.0,
-        }
-
-    # 计算n6HRing - 6元芳香环的数量
-    try:
-        ri = mol.GetRingInfo()
-        n6HRing = 0
-        for ring in ri.AtomRings():
-            if len(ring) == 6:
-                # 检查环中所有原子是否是芳香原子
-                if all(mol.GetAtomWithIdx(idx).GetIsAromatic() for idx in ring):
-                    n6HRing += 1
-    except Exception as e:
-        st.warning(f"n6HRing calculation error: {str(e)}")
-        n6HRing = 0
-
-    # 计算Mordred描述符 SdssC - 需要3D结构
-    try:
-        # 创建分子的3D副本
-        mol_3d = Chem.Mol(mol)
-        mol_3d = Chem.AddHs(mol_3d)  # 确保添加氢原子
-        AllChem.EmbedMolecule(mol_3d)  # 生成3D坐标
-        AllChem.MMFFOptimizeMolecule(mol_3d)  # 优化几何结构
-
-        # 计算Mordred描述符
-        calc = get_mordred_calculator()
-        if calc:
-            mordred_desc = calc(mol_3d)
-            # 获取SdssC值
-            sdssc = mordred_desc["SdssC"] if hasattr(mordred_desc, "SdssC") else 0.0
-        else:
-            sdssc = 0.0
-    except Exception as e:
-        st.warning(f"Mordred descriptor calculation error: {str(e)}")
-        sdssc = 0.0
-
-    # 只返回所需的特征
-    return {
-        "nBondsD": rdkit_descs["nBondsD"],
-        "SdssC": sdssc,
-        "PEOE_VSA8": rdkit_descs["PEOE_VSA8"],
-        "SMR_VSA3": rdkit_descs["SMR_VSA3"],
-        "n6HRing": n6HRing,
-        "SMR_VSA10": rdkit_descs["SMR_VSA10"]
-    }
 
 # 如果点击提交按钮
 if submit_button:
@@ -377,9 +395,17 @@ if submit_button:
 
                 # 获取溶剂参数
                 solvent_params = solvent_data[solvent]
-
+                
                 # 计算指定描述符 - 现在传递SMILES字符串
-                desc_values = get_descriptors(smiles)
+                rdkit_features = calc_rdkit_descriptors(smiles)
+                mordred_features = calc_mordred_descriptors(smiles)
+                common_indices = rdkit_features.index.intersection(mordred_features.index)
+                # 确保所有DataFrame使用相同的索引
+                valid_df = data.iloc[common_indices].reset_index(drop=True)
+                rdkit_clean = rdkit_features.loc[common_indices].reset_index(drop=True)
+                mordred_clean = mordred_features.loc[common_indices].drop('SMILES', axis=1).reset_index(drop=True)
+                final_df = merge_features_without_duplicates(valid_df, rdkit_clean, mordred_clean)
+                data = final_df.loc[:, ['nBondsD', 'SdssC', 'PEOE_VSA8', 'SMR_VSA3', 'n6HRing', 'SMR_VSA10']]
 
                 # 创建输入数据表 - 使用新的特征
                 input_data = {
@@ -389,7 +415,13 @@ if submit_button:
                     "SdP": [solvent_params["SdP"]],
                     "SA": [solvent_params["SA"]],
                     "SB": [solvent_params["SB"]],
-                    **desc_values
+                    'nBondsD': [data["nBondsD"]], 
+                    'SdssC': [data["SdssC"]], 
+                    'PEOE_VSA8': [data["PEOE_VSA8"]], 
+                    'SMR_VSA3': [data["SMR_VSA3"]], 
+                    'n6HRing': [data["n6HRing"]], 
+                    'SMR_VSA10': [data["SMR_VSA10"]]
+                    
                 }
             
                 input_df = pd.DataFrame(input_data)
@@ -405,7 +437,12 @@ if submit_button:
                     "SdP": [solvent_params["SdP"]],
                     "SA": [solvent_params["SA"]],
                     "SB": [solvent_params["SB"]],
-                    **desc_values
+                    'nBondsD': [data["nBondsD"]], 
+                    'SdssC': [data["SdssC"]], 
+                    'PEOE_VSA8': [data["PEOE_VSA8"]], 
+                    'SMR_VSA3': [data["SMR_VSA3"]], 
+                    'n6HRing': [data["n6HRing"]], 
+                    'SMR_VSA10': [data["SMR_VSA10"]]
                 })
                 
                 # 加载模型并预测
@@ -414,14 +451,12 @@ if submit_button:
                     predictor = load_predictor()
                     
                     # 只使用最关键的模型进行预测，减少内存占用
-                    essential_models = ['LightGBM',
-                                         'LightGBMXT',
-                                         'CatBoost',
-                                         'XGBoost',
-                                         'NeuralNetTorch',
+                    essential_models = ['CatBoost',
+                                         'LightGBM',
                                          'LightGBMLarge',
-                                         'MultiModalPredictor',
-                                         'WeightedEnsemble_L2']
+                                         'RandomForestMSE',
+                                         'WeightedEnsemble_L2',
+                                         'XGBoost']
                     predict_df_1 = pd.concat([predict_df,predict_df],axis=0)
                     predictions_dict = {}
                     
