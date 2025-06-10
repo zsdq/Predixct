@@ -265,7 +265,7 @@ def mol_to_image(mol, size=(300, 300)):
         svg = re.sub(r'viewBox="[^"]+"', f'viewBox="0 0 {size[0]} {size[1]}"', svg)
     
     return svg
-# 1. 改进的RDKit描述符计算函数
+# RDKit 描述符计算函数
 def calc_rdkit_descriptors(smiles_list):
     # 获取所有可用描述符名称
     desc_names = [desc_name for desc_name, _ in Descriptors._descList]
@@ -275,11 +275,11 @@ def calc_rdkit_descriptors(smiles_list):
     valid_indices = []
     skipped_molecules = []
     
-    for idx, smi in tqdm(enumerate(smiles_list), total=len(smiles_list), desc="计算RDKit描述符"):
+    for idx, smi in tqdm(enumerate(smiles_list), total=len(smiles_list), desc="Calculating RDKit descriptors"):
         try:
             mol = Chem.MolFromSmiles(smi)
             if mol is None:
-                raise ValueError(f"无效的SMILES: {smi}")
+                raise ValueError(f"Invalid SMILES: {smi}")
             
             # 添加氢原子以获得更准确的计算
             mol = Chem.AddHs(mol)
@@ -302,14 +302,15 @@ def calc_rdkit_descriptors(smiles_list):
             valid_indices.append(idx)
         except Exception as e:
             skipped_molecules.append((smi, str(e)))
-            print(f"跳过SMILES: {smi}, 原因: {str(e)}")
+            print(f"Skipped SMILES: {smi}, reason: {str(e)}")
             continue
     
     # 转换为DataFrame并保留有效索引
     df_desc = pd.DataFrame(results, columns=desc_names, index=valid_indices)
     
     return df_desc
-# 2. 改进的Mordred描述符计算函数（不再需要Missing）
+
+# Mordred 描述符计算函数
 def calc_mordred_descriptors(smiles_list):
     # 创建仅包含2D描述符的计算器
     calc = Calculator(descriptors, ignore_3D=True)
@@ -318,11 +319,11 @@ def calc_mordred_descriptors(smiles_list):
     valid_smiles = []
     skipped_molecules = []
     
-    for smi in tqdm(smiles_list, desc="计算Mordred描述符"):
+    for smi in tqdm(smiles_list, desc="Calculating Mordred descriptors"):
         try:
             mol = Chem.MolFromSmiles(smi)
             if mol is None:
-                raise ValueError(f"无效的SMILES: {smi}")
+                raise ValueError(f"Invalid SMILES: {smi}")
             
             # 添加氢原子以获得更准确的计算
             mol = Chem.AddHs(mol)
@@ -349,14 +350,15 @@ def calc_mordred_descriptors(smiles_list):
             valid_smiles.append(smi)
         except Exception as e:
             skipped_molecules.append((smi, str(e)))
-            print(f"跳过SMILES: {smi}, 原因: {str(e)}")
+            print(f"Skipped SMILES: {smi}, reason: {str(e)}")
             continue
     
     # 创建DataFrame
     df_mordred = pd.DataFrame(results)
     df_mordred['SMILES'] = valid_smiles
     return df_mordred
-# 3. 改进的特征合并函数
+
+# 改进的特征合并函数
 def merge_features_without_duplicates(original_df, *feature_dfs):
     """合并多个特征DataFrame并去除重复列"""
     # 按顺序合并（后出现的重复列会被丢弃）
@@ -364,6 +366,20 @@ def merge_features_without_duplicates(original_df, *feature_dfs):
     
     # 保留第一个出现的列（根据合并顺序）
     merged = merged.loc[:, ~merged.columns.duplicated()]
+    
+    # 添加特征统计信息
+    print("\nFeature statistics:")
+    print(f"Total number of features: {len(merged.columns)}")
+    
+    # 计算缺失值比例
+    missing_percentage = merged.isna().mean().sort_values(ascending=False)
+    high_missing = missing_percentage[missing_percentage > 0.5]
+    
+    if not high_missing.empty:
+        print("\nHigh missing value features (>50%):")
+        for feature, percentage in high_missing.items():
+            print(f"  - {feature}: {percentage:.1%}")
+    
     return merged
 
 
@@ -399,12 +415,18 @@ if submit_button:
 
                 # 获取溶剂参数
                 solvent_params = solvent_data[solvent]
+
+                # 获取溶剂参数
+                solvent_params = solvent_data[solvent]
                 
                 # 计算指定描述符 - 现在传递SMILES字符串
-                rdkit_features = calc_rdkit_descriptors(smiles)
-                mordred_features = calc_mordred_descriptors(smiles)
-                final_df = pd.concat([rdkit_features, mordred_features]).drop_duplicates()
-                data = final_df.loc[:, ['nBondsD', 'SdssC', 'PEOE_VSA8', 'SMR_VSA3', 'n6HRing', 'SMR_VSA10']]
+                smiles_list = [smiles]  # 将单个 SMILES 转换为列表
+                rdkit_features = calc_rdkit_descriptors(smiles_list)
+                mordred_features = calc_mordred_descriptors(smiles_list)
+                
+                # 合并特征并去除重复列
+                merged_features = merge_features_without_duplicates(rdkit_features, mordred_features)
+                data=merged_features.loc[:, ['nBondsD', 'SdssC', 'PEOE_VSA8', 'SMR_VSA3', 'n6HRing', 'SMR_VSA10']]
 
                 # 创建输入数据表 - 使用新的特征
                 input_data = {
