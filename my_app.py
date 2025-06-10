@@ -463,7 +463,7 @@ if submit_button:
                     'SMR_VSA3': [data.iloc[0]['SMR_VSA3']], 
                     'n6HRing': [data.iloc[0]['n6HRing']], 
                     'SMR_VSA10': [data.iloc[0]['SMR_VSA10']]
-                }
+                })
                 
                 # 加载模型并预测
                 try:
