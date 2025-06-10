@@ -403,7 +403,7 @@ if submit_button:
                 st.write("Input Data:")
                 st.dataframe(input_df)
 
-                # 创建预测用数据框
+                # 创建预测用数据框 - 使用新的特征
                 predict_df = pd.DataFrame({
                     "SMILES": [smiles],
                     "Et30": [solvent_params["Et30"]],
@@ -411,10 +411,12 @@ if submit_button:
                     "SdP": [solvent_params["SdP"]],
                     "SA": [solvent_params["SA"]],
                     "SB": [solvent_params["SB"]],
-                    "MAXdssC": [desc_values["MAXdssC"]],
-                    "VSA_EState7": [desc_values["VSA_EState7"]],
-                    "SMR_VSA10": [desc_values["SMR_VSA10"]],
-                    "PEOE_VSA8": [desc_values["PEOE_VSA8"]]
+                    "nBondsD": [desc_values["nBondsD"]],
+                    "SdssC": [desc_values["SdssC"]],
+                    "PEOE_VSA8": [desc_values["PEOE_VSA8"]],
+                    "SMR_VSA3": [desc_values["SMR_VSA3"]],
+                    "n6HRing": [desc_values["n6HRing"]],
+                    "SMR_VSA10": [desc_values["SMR_VSA10"]]
                 })
                 
                 # 加载模型并预测
