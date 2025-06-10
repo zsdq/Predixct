@@ -436,13 +436,12 @@ if submit_button:
                     "SdP": [solvent_params["SdP"]],
                     "SA": [solvent_params["SA"]],
                     "SB": [solvent_params["SB"]],
-                    'nBondsD': [data["nBondsD"]], 
-                    'SdssC': [data["SdssC"]], 
-                    'PEOE_VSA8': [data["PEOE_VSA8"]], 
-                    'SMR_VSA3': [data["SMR_VSA3"]], 
-                    'n6HRing': [data["n6HRing"]], 
-                    'SMR_VSA10': [data["SMR_VSA10"]]
-                    
+                    'nBondsD': [data.iloc[0]['nBondsD']], 
+                    'SdssC': [data.iloc[0]['SdssC']], 
+                    'PEOE_VSA8': [data.iloc[0]['PEOE_VSA8']], 
+                    'SMR_VSA3': [data.iloc[0]['SMR_VSA3']], 
+                    'n6HRing': [data.iloc[0]['n6HRing']], 
+                    'SMR_VSA10': [data.iloc[0]['SMR_VSA10']]
                 }
             
                 input_df = pd.DataFrame(input_data)
@@ -458,13 +457,13 @@ if submit_button:
                     "SdP": [solvent_params["SdP"]],
                     "SA": [solvent_params["SA"]],
                     "SB": [solvent_params["SB"]],
-                    'nBondsD': [data["nBondsD"]], 
-                    'SdssC': [data["SdssC"]], 
-                    'PEOE_VSA8': [data["PEOE_VSA8"]], 
-                    'SMR_VSA3': [data["SMR_VSA3"]], 
-                    'n6HRing': [data["n6HRing"]], 
-                    'SMR_VSA10': [data["SMR_VSA10"]]
-                })
+                    'nBondsD': [data.iloc[0]['nBondsD']], 
+                    'SdssC': [data.iloc[0]['SdssC']], 
+                    'PEOE_VSA8': [data.iloc[0]['PEOE_VSA8']], 
+                    'SMR_VSA3': [data.iloc[0]['SMR_VSA3']], 
+                    'n6HRing': [data.iloc[0]['n6HRing']], 
+                    'SMR_VSA10': [data.iloc[0]['SMR_VSA10']]
+                }
                 
                 # 加载模型并预测
                 try:
