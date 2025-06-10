@@ -269,6 +269,7 @@ def mol_to_image(mol, size=(300, 300)):
     return svg
 
 
+# 修改描述符计算函数
 @st.cache_data(max_entries=10)  # 缓存最多10个分子的描述符计算
 def get_descriptors(smiles_str):
     """获取指定的分子描述符并缓存结果"""
@@ -276,16 +277,17 @@ def get_descriptors(smiles_str):
     mol = Chem.MolFromSmiles(smiles_str)
     if not mol:
         return None
-    
+
     # 添加氢原子
     mol = Chem.AddHs(mol)
-    
+
     # 计算RDKit描述符 - 使用添加了H的分子
     try:
         rdkit_descs = {
             "PEOE_VSA8": Descriptors.PEOE_VSA8(mol),
             "SMR_VSA3": Descriptors.SMR_VSA3(mol),
             "SMR_VSA10": Descriptors.SMR_VSA10(mol),
+            "nBondsD": Descriptors.NumDoubleBonds(mol),
         }
     except Exception as e:
         st.warning(f"RDKit descriptor calculation error: {str(e)}")
@@ -293,47 +295,52 @@ def get_descriptors(smiles_str):
             "PEOE_VSA8": 0.0,
             "SMR_VSA3": 0.0,
             "SMR_VSA10": 0.0,
+            "nBondsD": 0.0,
         }
 
-    # 计算Mordred描述符 - 需要3D结构
+    # 计算n6HRing - 6元芳香环的数量
+    try:
+        ri = mol.GetRingInfo()
+        n6HRing = 0
+        for ring in ri.AtomRings():
+            if len(ring) == 6:
+                # 检查环中所有原子是否是芳香原子
+                if all(mol.GetAtomWithIdx(idx).GetIsAromatic() for idx in ring):
+                    n6HRing += 1
+    except Exception as e:
+        st.warning(f"n6HRing calculation error: {str(e)}")
+        n6HRing = 0
+
+    # 计算Mordred描述符 SdssC - 需要3D结构
     try:
         # 创建分子的3D副本
         mol_3d = Chem.Mol(mol)
         mol_3d = Chem.AddHs(mol_3d)  # 确保添加氢原子
         AllChem.EmbedMolecule(mol_3d)  # 生成3D坐标
         AllChem.MMFFOptimizeMolecule(mol_3d)  # 优化几何结构
-        
+
         # 计算Mordred描述符
         calc = get_mordred_calculator()
         mordred_desc = calc(mol_3d)
-        
-        # 获取所需特征值
-        nBondsD = mordred_desc["nBondsD"]
-        SdssC = mordred_desc["SdssC"]
-        n6HRing = mordred_desc["n6HRing"]
-        
-        # 处理缺失值
-        if pd.isna(nBondsD):
-            nBondsD = 0
-        if pd.isna(SdssC):
-            SdssC = 0.0
-        if pd.isna(n6HRing):
-            n6HRing = 0
+
+        # 获取SdssC值
+        sdssc = mordred_desc["SdssC"]
+        if pd.isna(sdssc):
+            sdssc = 0.0
     except Exception as e:
         st.warning(f"Mordred descriptor calculation error: {str(e)}")
-        nBondsD = 0
-        SdssC = 0.0
-        n6HRing = 0
+        sdssc = 0.0
 
     return {
-        "nBondsD": nBondsD,
-        "SdssC": SdssC,
+        "SdssC": sdssc,
         "n6HRing": n6HRing,
         **rdkit_descs
     }
-
-
-
+# 修改Mordred计算器只计算SdssC描述符以提高效率
+@st.cache_resource
+def get_mordred_calculator():
+    """创建并缓存 Mordred 计算器，只计算SdssC"""
+    return Calculator([descriptors.SdssC], ignore_3D=True)
 
 # 如果点击提交按钮
 if submit_button:
@@ -371,7 +378,10 @@ if submit_button:
                 # 计算指定描述符 - 现在传递SMILES字符串
                 desc_values = get_descriptors(smiles)
 
-                # 创建输入数据表
+               # 计算指定描述符 - 现在传递SMILES字符串
+                desc_values = get_descriptors(smiles)
+            
+                # 创建输入数据表 - 使用新的特征
                 input_data = {
                     "SMILES": [smiles],
                     "Et30": [solvent_params["Et30"]],
@@ -379,12 +389,14 @@ if submit_button:
                     "SdP": [solvent_params["SdP"]],
                     "SA": [solvent_params["SA"]],
                     "SB": [solvent_params["SB"]],
-                    "MAXdssC": [desc_values["MAXdssC"]],
-                    "VSA_EState7": [desc_values["VSA_EState7"]],
-                    "SMR_VSA10": [desc_values["SMR_VSA10"]],
+                    "nBondsD": [desc_values["nBondsD"]],
+                    "SdssC": [desc_values["SdssC"]],
                     "PEOE_VSA8": [desc_values["PEOE_VSA8"]],
+                    "SMR_VSA3": [desc_values["SMR_VSA3"]],
+                    "n6HRing": [desc_values["n6HRing"]],
+                    "SMR_VSA10": [desc_values["SMR_VSA10"]],
                 }
-
+            
                 input_df = pd.DataFrame(input_data)
                 
                 # 显示输入数据
